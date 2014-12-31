@@ -2,11 +2,8 @@ package main
 
 import (
 	"errors"
-	//"flag"
 	"html/template"
 	"io/ioutil"
-	//"log"
-	//"net"
 	"net/http"
 	"regexp"
 )
@@ -17,13 +14,8 @@ type Page struct {
 }
 
 //var addr = flag.Bool("addr", false, "find open addr and print to final-port.txt")
-var templates = template.Must(template.ParseFiles("edit.html", "view.html"))
-var validPath = regexp.MustCompile("^/(edit|save|view)/([a-zA-Z0-9]+)$")
-
-func (p *Page) save() error {
-	filename := p.Title + ".txt"
-	return ioutil.WriteFile(filename, p.Body, 0600)
-}
+var templates = template.Must(template.ParseFiles("view.html"))
+var validPath = regexp.MustCompile("^/(view)/([a-zA-Z0-9]+)$")
 
 func loadPage(title string) (*Page, error) {
 	filename := title + ".txt"
@@ -72,45 +64,8 @@ func viewHandler(w http.ResponseWriter, r *http.Request, title string) {
 	renderTemplate(w, "view", p)
 }
 
-func editHandler(w http.ResponseWriter, r *http.Request, title string) {
-	p, err := loadPage(title)
-	if err != nil {
-		p = &Page{Title: title}
-	}
-	renderTemplate(w, "edit", p)
-}
-
-func saveHandler(w http.ResponseWriter, r *http.Request, title string) {
-	body := r.FormValue("body")
-	p := &Page{Title: title, Body: []byte(body)}
-	err := p.save()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	http.Redirect(w, r, "/view/"+title, http.StatusFound)
-}
-
 func main() {
-	//flag.Parse()
 	http.HandleFunc("/view/", makeHandler(viewHandler))
-	http.HandleFunc("/edit/", makeHandler(editHandler))
-	http.HandleFunc("/save/", makeHandler(saveHandler))
 
-	/*
-		if *addr {
-			l, err := net.Listen("tcp", "127.0.0.1:0")
-			if err != nil {
-				log.Fatal(err)
-			}
-			err = ioutil.WriteFile("final-port.txt", []byte(l.Addr().String()), 0644)
-			if err != nil {
-				log.Fatal(err)
-			}
-			s := &http.Server{}
-			s.Serve(l)
-			return
-		}
-	*/
 	http.ListenAndServe(":8080", nil)
 }
