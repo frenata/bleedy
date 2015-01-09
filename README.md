@@ -16,7 +16,7 @@ static generator
 
 http server
 -simple fileserver that handles requests for static files
--goroutine that checks for new/modified post/pages
+##-goroutine that checks for new/modified post/pages
 --checks for new/changed files and regenerates just that file
 -separate handler that checks for POST requests on comment forms and calls comment handler
 

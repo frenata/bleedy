@@ -8,18 +8,20 @@ import (
 	"github.com/frenata/blog"
 )
 
-const dir string = "static"
 const postsDir string = "server/posts"
+const postsExt string = ".md"
+const staticDir string = "server/static"
+const staticExt string = ".html"
 
 func check() {
-	p := blog.NewPosts(postsDir)
+	b := blog.NewBlog(postsDir, postsExt, staticDir, staticExt)
 	for {
 		time.Sleep(time.Second * 4)
-		p.CheckPosts()
+		b.Update()
 	}
 }
 
 func main() {
 	go check()
-	log.Fatal(http.ListenAndServe(":8080", http.FileServer(http.Dir(dir))))
+	log.Fatal(http.ListenAndServe(":8080", http.FileServer(http.Dir(staticDir))))
 }
