@@ -17,7 +17,8 @@ Something like: */
 // Format takes a filename of a template and uses that template to format it's data structure to a new slice of bytes.
 // String simply pretty prints the data held by the formatter.
 type Formatter interface {
-	Parse(b []byte, date time.Time) error
+	//New() *Formatter
+	Parse(b []byte, date time.Time) (Formatter, error)
 	Format(templateFile string) ([]byte, error)
 	String() string
 }
@@ -52,12 +53,13 @@ func NewPostFormatter() *PostFormatter {
 // PostFormatter takes a byte slice (from a markdowned text file), a date, and creates a new Post object.
 // The date should typically be the last modification time of the file, and will be overwritten
 // if a date is manually set in the Post metadata.
-func (p *PostFormatter) Parse(b []byte, date time.Time) error {
+func (p *PostFormatter) Parse(b []byte, date time.Time) (Formatter, error) {
+	p = new(PostFormatter)
 	content := string(b)
 
 	c := strings.SplitN(content, "Body:", 2)
 	if len(c) < 2 {
-		return errors.New("invalid post file - no content detected: ")
+		return nil, errors.New("invalid post file - no content detected: ")
 	}
 
 	// TODO: does this need validation / error checking?
@@ -85,7 +87,7 @@ func (p *PostFormatter) Parse(b []byte, date time.Time) error {
 
 	}
 
-	return nil
+	return p, nil
 }
 
 // parses the string against the specified dateformat, if it validates, manually set the post date

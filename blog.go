@@ -29,7 +29,7 @@ type Blog struct {
 	output   files                //  write directory/ext
 	template files                // template directory/ext
 	hash     map[string]time.Time // hash map to check for updates
-	format   Formatter
+	Formatter
 }
 
 // small struct to make Blog look prettier, defines a location and type of file, as well as a default filename.
@@ -51,7 +51,7 @@ func NewBlog(iDir, iExt, oDir, oExt, tDir, tExt string) *Blog {
 
 // SetFormatter sets the Formatter for Blog to use
 func (b *Blog) SetFormatter(f Formatter) {
-	b.format = f
+	b.Formatter = f
 }
 
 // SetInput sets the directory and file extension for markeddown text files.
@@ -83,31 +83,32 @@ func (b *Blog) SetDefaultTemplate(def string) {
 }
 
 // reads from the specified input file (markdown), creates a new Post, and returns it.
-func (b *Blog) readFile(file string, date time.Time) error {
+func (b *Blog) readFile(file string, date time.Time) (Formatter, error) {
 	name := path.Join(b.input.dir, file) + b.input.ext
 	content, err := ioutil.ReadFile(name)
 	if err != nil {
 		fmt.Println(err)
-		return err
+		return nil, err
 	}
+	f, err := b.Formatter.Parse(content, date)
 
-	err = b.format.Parse(content, date)
+	//err = b.format.Parse(content, date)
 	if err != nil {
-		return errors.New(fmt.Sprint(err) + name)
+		return nil, errors.New(fmt.Sprint(err) + name)
 	}
 
-	return nil // TODO: for saftey Formatter.Parse should probably return a buffer, and readFile/writeFile should pass it around
+	return f, nil // TODO: for saftey Formatter.Parse should probably return a buffer, and readFile/writeFile should pass it around
 }
 
 // formats and writes the content of a Post to the specified file
-func (b *Blog) writeFile(file string) error {
+func (b *Blog) writeFile(file string, f Formatter) error {
 	name := ""
 	//if p.Template == "" { // TODO fix for interface
 	name = b.template.def
 	//}
 	template := path.Join(b.template.dir, name) + b.template.ext
 
-	output, err := b.format.Format(template)
+	output, err := f.Format(template)
 	if err != nil {
 		return err
 	}
@@ -168,13 +169,13 @@ func (b *Blog) update(files []os.FileInfo) {
 	for _, f := range files {
 		n := strings.TrimSuffix(f.Name(), b.input.ext) // remove the suffix
 		fmt.Printf("Update %v\n", n)                   // TODO: log not print
-		/*post,*/ err := b.readFile(n, f.ModTime()) // read the file, creating a post
+		post, err := b.readFile(n, f.ModTime())        // read the file, creating a post
 		if err != nil {
 			fmt.Println(err) // TODO: log not print
 			return
 		}
 
-		err = b.writeFile(n) //, post) // write the post to a file
+		err = b.writeFile(n, post) // write the post to a file
 		if err != nil {
 			fmt.Println(err) // TODO: log not print
 			return
