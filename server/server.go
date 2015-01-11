@@ -9,18 +9,17 @@ import (
 )
 
 const (
-	postsDir        string = "server/posts"
-	postsExt        string = ".md"
-	staticDir       string = "server/static"
-	staticExt       string = ".html"
-	templateDir     string = "server/templates"
-	templateExt     string = ".t"
-	defaultTemplate string = "blog"
+	postsDir    string = "server/posts"
+	postsExt    string = ".md"
+	staticDir   string = "server/static"
+	staticExt   string = ".html"
+	templateDir string = "server/templates"
+	templateExt string = ".html"
 )
 
 func check() {
 	b := blog.NewBlog(postsDir, postsExt, staticDir, staticExt, templateDir, templateExt)
-	p := blog.NewPostFormatter()
+	p := blog.NewPostFormatter() // this should be fixed to accept various consts related to post formatting
 	b.SetFormatter(p)
 	for {
 		time.Sleep(time.Second * 4)
