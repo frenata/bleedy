@@ -10,8 +10,6 @@
 <h4>Category {{.Tag}}</h4>
 </div>
 <hr>
-<div class = "content">
-{{html .Body}}
-</div>
+<div>{{.Body}}</div>
 </body>
 </html>

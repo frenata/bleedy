@@ -25,7 +25,7 @@ type Post struct {
 	Title      string
 	Author     string
 	Tag        string
-	Body       string
+	Body       template.HTML //string //[]byte
 	date       time.Time
 	Template   string
 	DateFormat string
@@ -45,7 +45,8 @@ func NewPost(raw []byte, date time.Time) *Post {
 	}
 
 	// TODO: does this need validation / error checking?
-	p.Body = string(blackfriday.MarkdownCommon([]byte(c[1])))
+	bf := string(blackfriday.MarkdownCommon([]byte(c[1])))
+	p.Body = template.HTML(strings.TrimSpace(bf))
 	meta := strings.Split(c[0], "\n")
 
 	p.DateFormat = dateFormat
@@ -62,6 +63,8 @@ func NewPost(raw []byte, date time.Time) *Post {
 			p.Template = out
 		} else if ok, out := p.validateMeta(m, datePre); ok {
 			p.setDate(out)
+		} else if p.date.IsZero() {
+			p.date = date
 		}
 
 	}
@@ -96,7 +99,7 @@ func (p *Post) String() string {
 	g := "Tag: " + p.Tag + "\n"
 	d := "Date: " + p.Date() + "\n"
 
-	return t + a + g + d + "\n" + p.Body
+	return t + a + g + d + "\n" + string(p.Body)
 }
 
 // Format takes a template file and creates a []byte representing an html document populated with the Post content,
@@ -112,7 +115,7 @@ func (p *Post) Format(file string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	p.Body = strings.TrimSpace(p.Body)
+	//p.Body = strings.TrimSpace(p.Body)
 	fmt.Println(p.Body)
 	err = tmpl.Execute(buf, p)
 	if err != nil {
