@@ -1,7 +1,9 @@
 package blog
 
 import (
+	"bytes"
 	"fmt"
+	"html/template"
 	"strings"
 	"time"
 
@@ -20,12 +22,13 @@ const (
 
 // Post holds the content of a post, parsed from a file, metadata and body content.
 type Post struct {
-	title    string
-	author   string
-	tag      string
-	body     string
-	template string
-	date     time.Time
+	Title      string
+	Author     string
+	Tag        string
+	Body       string
+	date       time.Time
+	Template   string
+	DateFormat string
 	//comments Comments // TODO: bool for disqus comments?
 }
 
@@ -42,19 +45,21 @@ func NewPost(raw []byte, date time.Time) *Post {
 	}
 
 	// TODO: does this need validation / error checking?
-	p.body = string(blackfriday.MarkdownCommon([]byte(c[1])))
+	p.Body = string(blackfriday.MarkdownCommon([]byte(c[1])))
 	meta := strings.Split(c[0], "\n")
+
+	p.DateFormat = dateFormat
 
 	// new version of meta yanking: just grab each line, check if it validates any Meta tags, and assign it properly
 	for _, m := range meta {
 		if ok, out := p.validateMeta(m, titlePre); ok {
-			p.title = out
+			p.Title = out
 		} else if ok, out := p.validateMeta(m, authorPre); ok {
-			p.author = out
+			p.Author = out
 		} else if ok, out := p.validateMeta(m, tagPre); ok {
-			p.tag = out
+			p.Tag = out
 		} else if ok, out := p.validateMeta(m, templatePre); ok {
-			p.template = out
+			p.Template = out
 		} else if ok, out := p.validateMeta(m, datePre); ok {
 			p.setDate(out)
 		}
@@ -86,23 +91,37 @@ func (p *Post) validateMeta(m, pre string) (ok bool, output string) {
 
 // String prints the Post meta content and body.
 func (p *Post) String() string {
-	t := "Title: " + p.title + "\n"
-	a := "Author: " + p.author + "\n"
-	g := "Tag: " + p.tag + "\n"
-	d := "Date: " + p.date.Format(dateFormat) + "\n"
+	t := "Title: " + p.Title + "\n"
+	a := "Author: " + p.Author + "\n"
+	g := "Tag: " + p.Tag + "\n"
+	d := "Date: " + p.Date() + "\n"
 
-	return t + a + g + d + "\n" + p.body
-}
-
-// Template returns the Post specific template. If one was not set in the metadata, this should return ""
-func (p *Post) Template() string {
-	return p.template
+	return t + a + g + d + "\n" + p.Body
 }
 
 // Format takes a template file and creates a []byte representing an html document populated with the Post content,
 // ready for writing to a file.
-func (p *Post) Format(template string) ([]byte, error) {
-	bytes := []byte(fmt.Sprint(p))
+func (p *Post) Format(file string) ([]byte, error) {
+	// Must implement io.Writer
+	buf := &bytes.Buffer{}
+	/*tmpl,err := template.New("name").Parse(file)
+	// check errors
+	err = tmpl.Execute(out,data)*/
 
-	return bytes, nil
+	tmpl, err := template.ParseFiles(file)
+	if err != nil {
+		return nil, err
+	}
+	p.Body = strings.TrimSpace(p.Body)
+	fmt.Println(p.Body)
+	err = tmpl.Execute(buf, p)
+	if err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
+}
+
+func (p *Post) Date() string {
+	return p.date.Format(dateFormat)
 }

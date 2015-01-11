@@ -78,7 +78,7 @@ func (b *Blog) readFile(file string, date time.Time) (*Post, error) {
 // formats and writes the content of a Post to the specified file
 func (b *Blog) writeFile(file string, p *Post) error {
 	name := ""
-	if name = p.Template(); name == "" {
+	if p.Template == "" {
 		name = b.template.def
 	}
 	template := path.Join(b.template.dir, name) + b.template.ext
