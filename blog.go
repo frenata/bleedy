@@ -13,6 +13,7 @@ output.
 package blog
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"path"
@@ -76,7 +77,8 @@ func (b *Blog) SetDefaultTemplate(def string) {
 
 // reads from the specified input file (markdown), creates a new Post, and returns it.
 func (b *Blog) readFile(file string, date time.Time) (*Post, error) {
-	content, err := ioutil.ReadFile(path.Join(b.input.dir, file) + b.input.ext)
+	name := path.Join(b.input.dir, file) + b.input.ext
+	content, err := ioutil.ReadFile(name)
 	if err != nil {
 		fmt.Println(err)
 		return nil, err
@@ -84,7 +86,7 @@ func (b *Blog) readFile(file string, date time.Time) (*Post, error) {
 
 	p, err := NewPost(content, date)
 	if err != nil {
-		return nil, err
+		return nil, errors.New(fmt.Sprint(err) + name)
 	}
 
 	return p, nil

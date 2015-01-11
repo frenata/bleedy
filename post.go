@@ -41,7 +41,7 @@ func NewPost(raw []byte, date time.Time) (*Post, error) {
 
 	c := strings.SplitN(content, "Body:", 2)
 	if len(c) < 2 {
-		return nil, errors.New("invalid post file: no content detected")
+		return nil, errors.New("invalid post file - no content detected: ")
 	}
 
 	// TODO: does this need validation / error checking?
