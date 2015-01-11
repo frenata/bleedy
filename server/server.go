@@ -8,13 +8,18 @@ import (
 	"github.com/frenata/blog"
 )
 
-const postsDir string = "server/posts"
-const postsExt string = ".md"
-const staticDir string = "server/static"
-const staticExt string = ".html"
+const (
+	postsDir        string = "server/posts"
+	postsExt        string = ".md"
+	staticDir       string = "server/static"
+	staticExt       string = ".html"
+	templateDir     string = "server/templates"
+	templateExt     string = ".t"
+	defaultTemplate string = "blog"
+)
 
 func check() {
-	b := blog.NewBlog(postsDir, postsExt, staticDir, staticExt)
+	b := blog.NewBlog(postsDir, postsExt, staticDir, staticExt, templateDir, templateExt)
 	for {
 		time.Sleep(time.Second * 4)
 		b.Update()
