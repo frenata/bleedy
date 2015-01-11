@@ -2,7 +2,7 @@ package blog
 
 import (
 	"bytes"
-	"fmt"
+	"errors"
 	"html/template"
 	"strings"
 	"time"
@@ -35,13 +35,13 @@ type Post struct {
 // NewPost takes a byte slice (from a markdowned text file), a date, and creates a new Post object.
 // The date should typically be the last modification time of the file, and will be overwritten
 // if a date is manually set in the Post metadata.
-func NewPost(raw []byte, date time.Time) *Post {
+func NewPost(raw []byte, date time.Time) (*Post, error) {
 	p := new(Post)
 	content := string(raw)
 
 	c := strings.SplitN(content, "Body:", 2)
 	if len(c) < 2 {
-		return nil
+		return nil, errors.New("invalid post file: no content detected")
 	}
 
 	// TODO: does this need validation / error checking?
@@ -69,7 +69,7 @@ func NewPost(raw []byte, date time.Time) *Post {
 
 	}
 
-	return p
+	return p, nil
 }
 
 // parses the string against the specified dateformat, if it validates, manually set the post date
@@ -105,26 +105,22 @@ func (p *Post) String() string {
 // Format takes a template file and creates a []byte representing an html document populated with the Post content,
 // ready for writing to a file.
 func (p *Post) Format(file string) ([]byte, error) {
-	// Must implement io.Writer
-	buf := &bytes.Buffer{}
-	/*tmpl,err := template.New("name").Parse(file)
-	// check errors
-	err = tmpl.Execute(out,data)*/
+	buf := &bytes.Buffer{} // byte buffer to use for template execution
 
-	tmpl, err := template.ParseFiles(file)
-	if err != nil {
-		return nil, err
-	}
-	//p.Body = strings.TrimSpace(p.Body)
-	fmt.Println(p.Body)
-	err = tmpl.Execute(buf, p)
+	tmpl, err := template.ParseFiles(file) // load the template file
 	if err != nil {
 		return nil, err
 	}
 
-	return buf.Bytes(), nil
+	err = tmpl.Execute(buf, p) // add the post content into the template file
+	if err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil // write the buffer to a []byte prepped to write to a file.
 }
 
+// Format the date into configured readable format.
 func (p *Post) Date() string {
 	return p.date.Format(dateFormat)
 }

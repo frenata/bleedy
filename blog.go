@@ -1,3 +1,15 @@
+/*
+blog handles creation of a Blog that will scan an input directory for new/modified files (markdown for instance), and
+parse the metadata and content of those files (content with github.com/russross/blackfriday) and create files of the same
+name in html format in a designated output directory.
+
+NewBlog creates a new blog, SetInput/Output/Template allow finetuned or changing control of the directory/formats Blog scans for.
+
+The primary method is Blog.Update(), which scans for the new/modified files, checking their last modification date against an
+internal map. Changes trigger calls to read the file, create a new Post struct (see post.go), format it, and write it to the
+output.
+*/
+
 package blog
 
 import (
@@ -31,7 +43,6 @@ func NewBlog(iDir, iExt, oDir, oExt, tDir, tExt string) *Blog {
 	b.SetInput(iDir, iExt)
 	b.SetOutput(oDir, oExt)
 	b.SetTemplate(tDir, tExt)
-	b.SetDefaultTemplate("")
 	return b
 }
 
@@ -51,6 +62,7 @@ func (b *Blog) SetOutput(dir, ext string) {
 func (b *Blog) SetTemplate(dir, ext string) {
 	b.template.dir = dir
 	b.template.ext = ext
+	b.SetDefaultTemplate("")
 }
 
 // SetDefaultTemplate sets the filename for the default post template. This should be in the template directory.
@@ -70,8 +82,11 @@ func (b *Blog) readFile(file string, date time.Time) (*Post, error) {
 		return nil, err
 	}
 
-	p := NewPost(content, date)
-	//fmt.Println(p) //testing
+	p, err := NewPost(content, date)
+	if err != nil {
+		return nil, err
+	}
+
 	return p, nil
 }
 
@@ -116,7 +131,7 @@ func (b *Blog) Update() {
 		case strings.HasSuffix(n, b.input.ext): // check the suffix
 			n := strings.TrimSuffix(n, b.input.ext) // remove the suffix
 			if _, ok := b.hash[n]; ok {             // is it already in the hashmap?
-				fmt.Printf("%v was last updated %v ago\n", n, time.Since(b.hash[n])) // TODO: log not print
+				//fmt.Printf("%v was last updated %v ago\n", n, time.Since(b.hash[n])) // TODO: log not print
 				if b.hash[n] == f.ModTime() {
 					continue // file has not been modified since the last check, ignore it
 				}
