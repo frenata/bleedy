@@ -16,6 +16,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path"
 	"strings"
 	"time"
@@ -28,6 +29,7 @@ type Blog struct {
 	output   files                //  write directory/ext
 	template files                // template directory/ext
 	hash     map[string]time.Time // hash map to check for updates
+	format   Formatter
 }
 
 // small struct to make Blog look prettier, defines a location and type of file, as well as a default filename.
@@ -45,6 +47,11 @@ func NewBlog(iDir, iExt, oDir, oExt, tDir, tExt string) *Blog {
 	b.SetOutput(oDir, oExt)
 	b.SetTemplate(tDir, tExt)
 	return b
+}
+
+// SetFormatter sets the Formatter for Blog to use
+func (b *Blog) SetFormatter(f Formatter) {
+	b.format = f
 }
 
 // SetInput sets the directory and file extension for markeddown text files.
@@ -76,31 +83,31 @@ func (b *Blog) SetDefaultTemplate(def string) {
 }
 
 // reads from the specified input file (markdown), creates a new Post, and returns it.
-func (b *Blog) readFile(file string, date time.Time) (*Post, error) {
+func (b *Blog) readFile(file string, date time.Time) error {
 	name := path.Join(b.input.dir, file) + b.input.ext
 	content, err := ioutil.ReadFile(name)
 	if err != nil {
 		fmt.Println(err)
-		return nil, err
+		return err
 	}
 
-	p, err := NewPost(content, date)
+	err = b.format.Parse(content, date)
 	if err != nil {
-		return nil, errors.New(fmt.Sprint(err) + name)
+		return errors.New(fmt.Sprint(err) + name)
 	}
 
-	return p, nil
+	return nil // TODO: for saftey Formatter.Parse should probably return a buffer, and readFile/writeFile should pass it around
 }
 
 // formats and writes the content of a Post to the specified file
-func (b *Blog) writeFile(file string, p *Post) error {
+func (b *Blog) writeFile(file string) error {
 	name := ""
-	if p.Template == "" {
-		name = b.template.def
-	}
+	//if p.Template == "" { // TODO fix for interface
+	name = b.template.def
+	//}
 	template := path.Join(b.template.dir, name) + b.template.ext
 
-	output, err := p.Format(template)
+	output, err := b.format.Format(template)
 	if err != nil {
 		return err
 	}
@@ -113,10 +120,20 @@ func (b *Blog) writeFile(file string, p *Post) error {
 	return nil
 }
 
-// Update checks the read directory for changes to files. If it detects changes (based on last-modified time),
+// Break the logic in two: func Scan() which looks for and detects new/modified posts, and func Update(filename)
+// which updates a specific post. Both can be re-written to be unexported, then a simpler method ScanAndUpdate replicate
+// the old functionality of update. This will allow for easier implementationg of other update mechanisms, like ones
+// that include loading all the Posts into a [] and sorting them, and/or creating multipost pages.
+
+// UpdateScan checks the read directory for changes to files. If it detects changes (based on last-modified time),
 // it reads the input file and creates an output file of the same name.
 // Designed to be called continously in a loop.
-func (b *Blog) Update() {
+func (b *Blog) UpdateScan() {
+	b.update(b.scan(false))
+}
+
+// scans the input directory for new/modified files, adds them to the update list. If force == true, adds all files to the list.
+func (b *Blog) scan(force bool) (update []os.FileInfo) {
 	// read all the files in the input directory
 	files, err := ioutil.ReadDir(b.input.dir)
 	if err != nil {
@@ -134,24 +151,33 @@ func (b *Blog) Update() {
 			n := strings.TrimSuffix(n, b.input.ext) // remove the suffix
 			if _, ok := b.hash[n]; ok {             // is it already in the hashmap?
 				//fmt.Printf("%v was last updated %v ago\n", n, time.Since(b.hash[n])) // TODO: log not print
-				if b.hash[n] == f.ModTime() {
+				if b.hash[n] == f.ModTime() && !force {
 					continue // file has not been modified since the last check, ignore it
 				}
 			}
-			b.hash[n] = f.ModTime()                 // store the last modified time
-			fmt.Printf("Update %v\n", n)            // TODO: log not print
-			post, err := b.readFile(n, f.ModTime()) // read the file, creating a post
-			if err != nil {
-				fmt.Println(err) // TODO: log not print
-				return
-			}
-
-			err = b.writeFile(n, post) // write the post to a file
-			if err != nil {
-				fmt.Println(err) // TODO: log not print
-				return
-			}
+			update = append(update, f)
+			b.hash[n] = f.ModTime() // store the last modified time
 		}
 
+	}
+	return update
+}
+
+// takes a list of files, reads each, formats it, and writes it to the output
+func (b *Blog) update(files []os.FileInfo) {
+	for _, f := range files {
+		n := strings.TrimSuffix(f.Name(), b.input.ext) // remove the suffix
+		fmt.Printf("Update %v\n", n)                   // TODO: log not print
+		/*post,*/ err := b.readFile(n, f.ModTime()) // read the file, creating a post
+		if err != nil {
+			fmt.Println(err) // TODO: log not print
+			return
+		}
+
+		err = b.writeFile(n) //, post) // write the post to a file
+		if err != nil {
+			fmt.Println(err) // TODO: log not print
+			return
+		}
 	}
 }

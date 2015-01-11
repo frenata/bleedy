@@ -12,3 +12,8 @@ They implement all of their ESLRs **without** fail. And the curricular alignment
 * Abeka
 * Common Core
 * HSC
+
+### Extracurricular ###
+* Badminton
+* Other sports
+* Drama?

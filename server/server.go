@@ -20,9 +20,11 @@ const (
 
 func check() {
 	b := blog.NewBlog(postsDir, postsExt, staticDir, staticExt, templateDir, templateExt)
+	p := blog.NewPostFormatter()
+	b.SetFormatter(p)
 	for {
 		time.Sleep(time.Second * 4)
-		b.Update()
+		b.UpdateScan()
 	}
 }
 
