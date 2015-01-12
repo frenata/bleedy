@@ -141,6 +141,7 @@ func (p *PostFormatter) String() string {
 func (p *PostFormatter) Format(templateFile string) ([]byte, error) {
 	buf := &bytes.Buffer{} // byte buffer to use for template execution
 
+	// TODO: add logic to use locally defined templatefile
 	t, err := template.ParseFiles(templateFile) // load the template file
 	if err != nil {
 		return nil, err

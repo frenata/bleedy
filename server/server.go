@@ -1,10 +1,10 @@
 package main
 
 import (
-	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -26,7 +26,7 @@ func readConfig(filename string) ([]string, error) {
 
 func check(b *bleedy.Blog) {
 	for {
-		time.Sleep(time.Second * 4)
+		time.Sleep(time.Second * 10)
 		b.UpdateScan()
 	}
 }
@@ -35,19 +35,20 @@ func main() {
 	var err error
 	pc, bc := []string{}, []string{}
 	b, p := &bleedy.Blog{}, &bleedy.PostFormatter{}
+	l := log.New(os.Stdout, "bleedy server: ", log.Ltime)
 
 	if pc, err = readConfig(postConfig); err != nil {
-		fmt.Println(err)
+		l.Println(err)
 	} else if p, err = bleedy.NewPostFormatter(pc); err != nil {
-		fmt.Println(err)
+		l.Println(err)
 	} else if bc, err = readConfig(blogConfig); err != nil {
-		fmt.Println(err)
-	} else if b, err = bleedy.NewBlog(bc); err != nil {
-		fmt.Println(err)
+		l.Println(err)
+	} else if b, err = bleedy.NewBlog(bc, l); err != nil {
+		l.Println(err)
 	}
 
 	if err != nil {
-		return
+		l.Fatal("Fatal: failed to create blog properly")
 	}
 	b.SetFormatter(p)
 

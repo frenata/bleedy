@@ -15,6 +15,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 	"path"
 	"strings"
@@ -28,6 +29,7 @@ type Blog struct {
 	output   files                //  write directory/ext
 	template files                // template directory/ext
 	hash     map[string]time.Time // hash map to check for updates
+	log      *log.Logger
 	Formatter
 }
 
@@ -40,12 +42,12 @@ type files struct {
 
 // NewBlog creates a new Blog object, populated with all the directories/extensions for input/ouput/templates.
 // It also allocates the hashmap for checking file modification times.
-func NewBlog(conf []string) (*Blog, error) {
+func NewBlog(conf []string, log *log.Logger) (*Blog, error) {
 	b := &Blog{hash: make(map[string]time.Time)}
 	if err := b.config(conf); err != nil {
-		fmt.Println(err)
 		return nil, err
 	}
+	b.log = log
 	return b, nil
 }
 
@@ -93,23 +95,18 @@ func (b *Blog) readFile(file string, date time.Time) (Formatter, error) {
 		fmt.Println(err)
 		return nil, err
 	}
-	f, err := b.Formatter.Parse(content, date)
 
-	//err = b.format.Parse(content, date)
+	f, err := b.Formatter.Parse(content, date)
 	if err != nil {
 		return nil, errors.New(fmt.Sprint(err) + name)
 	}
 
-	return f, nil // TODO: for saftey Formatter.Parse should probably return a buffer, and readFile/writeFile should pass it around
+	return f, nil
 }
 
 // formats and writes the content of a Post to the specified file
 func (b *Blog) writeFile(file string, f Formatter) error {
-	name := ""
-	//if p.Template == "" { // TODO fix for interface
-	name = b.template.def
-	//}
-	template := path.Join(b.template.dir, name) + b.template.ext
+	template := path.Join(b.template.dir, b.template.def) + b.template.ext
 
 	output, err := f.Format(template)
 	if err != nil {
@@ -154,7 +151,7 @@ func (b *Blog) scan(force bool) (update []os.FileInfo) {
 		case strings.HasSuffix(n, b.input.ext): // check the suffix
 			n := strings.TrimSuffix(n, b.input.ext) // remove the suffix
 			if _, ok := b.hash[n]; ok {             // is it already in the hashmap?
-				//fmt.Printf("%v was last updated %v ago\n", n, time.Since(b.hash[n])) // TODO: log not print
+				b.log.Printf("%v was last updated %v ago\n", n, time.Since(b.hash[n]))
 				if b.hash[n] == f.ModTime() && !force {
 					continue // file has not been modified since the last check, ignore it
 				}
@@ -171,16 +168,16 @@ func (b *Blog) scan(force bool) (update []os.FileInfo) {
 func (b *Blog) update(files []os.FileInfo) {
 	for _, f := range files {
 		n := strings.TrimSuffix(f.Name(), b.input.ext) // remove the suffix
-		fmt.Printf("Update %v\n", n)                   // TODO: log not print
-		post, err := b.readFile(n, f.ModTime())        // read the file, creating a post
+		b.log.Printf("Update %v\n", n)
+		post, err := b.readFile(n, f.ModTime()) // read the file, creating a post
 		if err != nil {
-			fmt.Println(err) // TODO: log not print
+			b.log.Println(err, "Will continue trying.")
 			return
 		}
 
 		err = b.writeFile(n, post) // write the post to a file
 		if err != nil {
-			fmt.Println(err) // TODO: log not print
+			b.log.Println(err, "Will continue trying.")
 			return
 		}
 	}
