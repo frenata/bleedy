@@ -1,4 +1,4 @@
-package blog
+package bleedy
 
 import (
 	"bytes"
@@ -45,20 +45,20 @@ type configPostFormatter struct {
 // NewPostFormatter takes the contents of a configuration file and returns a correctly initialized PostFormatter
 func NewPostFormatter(conf []string) (*PostFormatter, error) {
 	//for now just convert the config string to the dateformat
-	if len(conf) < 8 {
+	if len(conf) != 8 {
 		return nil, errors.New("improper config file")
 	}
 	c := &configPostFormatter{}
 	p := &PostFormatter{config: c}
 
 	// initialize the constants
-	c.titlePre = strings.TrimPrefix(conf[0], "titlePre - ")
-	c.authorPre = strings.TrimPrefix(conf[1], "authorPre - ")
-	c.tagPre = strings.TrimPrefix(conf[2], "tagPre - ")
-	c.templatePre = strings.TrimPrefix(conf[3], "templatePre - ")
-	c.datePre = strings.TrimPrefix(conf[4], "datePre - ")
-	c.bodyPre = strings.TrimPrefix(conf[5], "bodyPre - ")
-	c.dateFormat = strings.TrimPrefix(conf[6], "dateFormat - ")
+	c.titlePre = strings.TrimPrefix(conf[0], "titlePre: ")
+	c.authorPre = strings.TrimPrefix(conf[1], "authorPre: ")
+	c.tagPre = strings.TrimPrefix(conf[2], "tagPre: ")
+	c.templatePre = strings.TrimPrefix(conf[3], "templatePre: ")
+	c.datePre = strings.TrimPrefix(conf[4], "datePre: ")
+	c.bodyPre = strings.TrimPrefix(conf[5], "bodyPre: ")
+	c.dateFormat = strings.TrimPrefix(conf[6], "dateFormat: ")
 	return p, nil
 }
 

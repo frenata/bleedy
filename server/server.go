@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -11,14 +12,8 @@ import (
 )
 
 const (
-	postsDir    string = "posts"
-	postsExt    string = ".md"
-	staticDir   string = "static"
-	staticExt   string = ".html"
-	templateDir string = "templates"
-	templateExt string = ".html"
-	postConfig  string = "post.config"
-	blogConfig  string = "blog.config"
+	postConfig string = "post.config"
+	blogConfig string = "blog.config"
 )
 
 func readConfig(filename string) ([]string, error) {
@@ -29,12 +24,7 @@ func readConfig(filename string) ([]string, error) {
 	return strings.Split(string(b), "\n"), nil
 }
 
-func check() {
-	pc, _ := readConfig(postConfig)
-	p, _ := blog.NewPostFormatter(pc)
-	_, _ = readConfig(blogConfig)
-	b := blog.NewBlog(postsDir, postsExt, staticDir, staticExt, templateDir, templateExt)
-	b.SetFormatter(p)
+func check(b *bleedy.Blog) {
 	for {
 		time.Sleep(time.Second * 4)
 		b.UpdateScan()
@@ -42,6 +32,25 @@ func check() {
 }
 
 func main() {
-	go check()
-	log.Fatal(http.ListenAndServe(":8080", http.FileServer(http.Dir(staticDir))))
+	var err error
+	pc, bc := []string{}, []string{}
+	b, p := &bleedy.Blog{}, &bleedy.PostFormatter{}
+
+	if pc, err = readConfig(postConfig); err != nil {
+		fmt.Println(err)
+	} else if p, err = bleedy.NewPostFormatter(pc); err != nil {
+		fmt.Println(err)
+	} else if bc, err = readConfig(blogConfig); err != nil {
+		fmt.Println(err)
+	} else if b, err = bleedy.NewBlog(bc); err != nil {
+		fmt.Println(err)
+	}
+
+	if err != nil {
+		return
+	}
+	b.SetFormatter(p)
+
+	go check(b)
+	log.Fatal(http.ListenAndServe(":8080", http.FileServer(http.Dir(b.Output()))))
 }

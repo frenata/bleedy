@@ -1,5 +1,5 @@
 /*
-blog handles creation of a Blog that will scan an input directory for new/modified files (markdown for instance), and
+bleedy handles creation of a Blog that will scan an input directory for new/modified files (markdown for instance), and
 parse the metadata and content of those files (content with github.com/russross/blackfriday) and create files of the same
 name in html format in a designated output directory.
 
@@ -9,8 +9,7 @@ The primary method is Blog.Update(), which scans for the new/modified files, che
 internal map. Changes trigger calls to read the file, create a new Post struct (see post.go), format it, and write it to the
 output.
 */
-
-package blog
+package bleedy
 
 import (
 	"errors"
@@ -41,12 +40,13 @@ type files struct {
 
 // NewBlog creates a new Blog object, populated with all the directories/extensions for input/ouput/templates.
 // It also allocates the hashmap for checking file modification times.
-func NewBlog(iDir, iExt, oDir, oExt, tDir, tExt string) *Blog {
+func NewBlog(conf []string) (*Blog, error) {
 	b := &Blog{hash: make(map[string]time.Time)}
-	b.SetInput(iDir, iExt)
-	b.SetOutput(oDir, oExt)
-	b.SetTemplate(tDir, tExt)
-	return b
+	if err := b.config(conf); err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
+	return b, nil
 }
 
 // SetFormatter sets the Formatter for Blog to use
@@ -54,32 +54,35 @@ func (b *Blog) SetFormatter(f Formatter) {
 	b.Formatter = f
 }
 
-// SetInput sets the directory and file extension for markeddown text files.
-func (b *Blog) SetInput(dir, ext string) {
-	b.input.dir = dir
-	b.input.ext = ext
-}
+// Config sets the directory and file extensions for input,output,and template directories.
+func (b *Blog) config(conf []string) error {
+	if len(conf) != 8 {
+		return errors.New("improper config file")
+	}
+	// initialize the constants
+	b.input.dir = strings.TrimPrefix(conf[0], "inputDir: ")
+	b.input.ext = strings.TrimPrefix(conf[1], "inputExt: ")
+	b.output.dir = strings.TrimPrefix(conf[2], "outputDir: ")
+	b.output.ext = strings.TrimPrefix(conf[3], "outputExt: ")
+	b.template.dir = strings.TrimPrefix(conf[4], "templateDir: ")
+	b.template.ext = strings.TrimPrefix(conf[5], "templateExt: ")
+	b.setDefaultTemplate(strings.TrimPrefix(conf[6], "defaultTem: "))
 
-// SetOutput sets the directory and file extension for generated html files.
-func (b *Blog) SetOutput(dir, ext string) {
-	b.output.dir = dir
-	b.output.ext = ext
-}
-
-// SetTemplate sets the directory and file extension for template files.
-func (b *Blog) SetTemplate(dir, ext string) {
-	b.template.dir = dir
-	b.template.ext = ext
-	b.SetDefaultTemplate("")
+	return nil
 }
 
 // SetDefaultTemplate sets the filename for the default post template. This should be in the template directory.
-func (b *Blog) SetDefaultTemplate(def string) {
+func (b *Blog) setDefaultTemplate(def string) {
 	if def != "" {
 		b.template.def = def
 	} else {
 		b.template.def = "default"
 	}
+}
+
+// Output returns the ouput directory of the blog, for serving HTTP
+func (b *Blog) Output() string {
+	return b.output.dir
 }
 
 // reads from the specified input file (markdown), creates a new Post, and returns it.
