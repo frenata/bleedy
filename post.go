@@ -10,89 +10,105 @@ import (
 	"github.com/russross/blackfriday"
 )
 
-/* TODO: tweak Post struct to work as the implementation of an interface?
-Something like: */
-
-// Parse takes a slice of bytes (most likely from a file) and parses them into the data structure.
-// Format takes a filename of a template and uses that template to format it's data structure to a new slice of bytes.
-// String simply pretty prints the data held by the formatter.
+// Formatter defines an interface that can Parse an input byte slice into some data, later work with a template file to
+// Format that data into another byte slice, and can also pretty print itself with String() for simple representation.
 type Formatter interface {
-	//New() *Formatter
 	Parse(b []byte, date time.Time) (Formatter, error)
 	Format(templateFile string) ([]byte, error)
 	String() string
+	Date() string
 }
-
-// TODO: These should either be part of the Post struct or live in a config file.
-const (
-	titlePre    string = "Title: "
-	authorPre   string = "Author: "
-	tagPre      string = "Tag: "
-	datePre     string = "Date: "
-	templatePre string = "Template: "
-	dateFormat  string = "2 January 2006 @ 3:04pm"
-)
 
 // Post holds the content of a post, parsed from a file, metadata and body content.
 type PostFormatter struct {
-	Title      string
-	Author     string
-	Tag        string
-	Body       template.HTML //string //[]byte
-	date       time.Time
-	Template   string
-	DateFormat string
+	Title    string
+	Author   string
+	Tag      string
+	Template string
+	Body     template.HTML //string //[]byte
+	date     time.Time
+	config   *configPostFormatter
 	//comments Comments // TODO: bool for disqus comments?
 }
 
-func NewPostFormatter() *PostFormatter {
+// config struct to be read from a file - remove all the consts
+type configPostFormatter struct {
+	titlePre    string
+	bodyPre     string
+	authorPre   string
+	tagPre      string
+	datePre     string
+	templatePre string
+	dateFormat  string
+}
+
+// NewPostFormatter takes the contents of a configuration file and returns a correctly initialized PostFormatter
+func NewPostFormatter(conf []string) (*PostFormatter, error) {
+	//for now just convert the config string to the dateformat
+	if len(conf) < 8 {
+		return nil, errors.New("improper config file")
+	}
+	c := &configPostFormatter{}
+	p := &PostFormatter{config: c}
+
 	// initialize the constants
-	return new(PostFormatter)
+	c.titlePre = strings.TrimPrefix(conf[0], "titlePre - ")
+	c.authorPre = strings.TrimPrefix(conf[1], "authorPre - ")
+	c.tagPre = strings.TrimPrefix(conf[2], "tagPre - ")
+	c.templatePre = strings.TrimPrefix(conf[3], "templatePre - ")
+	c.datePre = strings.TrimPrefix(conf[4], "datePre - ")
+	c.bodyPre = strings.TrimPrefix(conf[5], "bodyPre - ")
+	c.dateFormat = strings.TrimPrefix(conf[6], "dateFormat - ")
+	return p, nil
+}
+
+func newPost(c *configPostFormatter) (*PostFormatter, error) {
+	p := &PostFormatter{config: c}
+	return p, nil
 }
 
 // PostFormatter takes a byte slice (from a markdowned text file), a date, and creates a new Post object.
 // The date should typically be the last modification time of the file, and will be overwritten
 // if a date is manually set in the Post metadata.
 func (p *PostFormatter) Parse(b []byte, date time.Time) (Formatter, error) {
-	p = new(PostFormatter)
-	content := string(b)
+	newP, err := newPost(p.config)
+	if err != nil {
+		return nil, err
+	}
 
-	c := strings.SplitN(content, "Body:", 2)
+	content := string(b)
+	c := strings.SplitN(content, newP.config.bodyPre, 2)
 	if len(c) < 2 {
 		return nil, errors.New("invalid post file - no content detected: ")
 	}
 
 	// TODO: does this need validation / error checking?
 	bf := string(blackfriday.MarkdownCommon([]byte(c[1])))
-	p.Body = template.HTML(strings.TrimSpace(bf))
-	meta := strings.Split(c[0], "\n")
-
-	p.DateFormat = dateFormat
+	newP.Body = template.HTML(strings.TrimSpace(bf))
 
 	// new version of meta yanking: just grab each line, check if it validates any Meta tags, and assign it properly
+	meta := strings.Split(c[0], "\n")
 	for _, m := range meta {
-		if ok, out := p.validateMeta(m, titlePre); ok {
-			p.Title = out
-		} else if ok, out := p.validateMeta(m, authorPre); ok {
-			p.Author = out
-		} else if ok, out := p.validateMeta(m, tagPre); ok {
-			p.Tag = out
-		} else if ok, out := p.validateMeta(m, templatePre); ok {
-			p.Template = out
-		} else if ok, out := p.validateMeta(m, datePre); ok {
-			p.setDate(out)
-		} else if p.date.IsZero() {
-			p.date = date
+		if ok, out := newP.validateMeta(m, newP.config.titlePre); ok {
+			newP.Title = out
+		} else if ok, out := newP.validateMeta(m, newP.config.authorPre); ok {
+			newP.Author = out
+		} else if ok, out := newP.validateMeta(m, newP.config.tagPre); ok {
+			newP.Tag = out
+		} else if ok, out := newP.validateMeta(m, newP.config.templatePre); ok {
+			newP.Template = out
+		} else if ok, out := newP.validateMeta(m, newP.config.datePre); ok {
+			newP.setDate(out)
+		} else if newP.date.IsZero() {
+			newP.date = date
 		}
-
 	}
-
-	return p, nil
+	return newP, nil
 }
 
 // parses the string against the specified dateformat, if it validates, manually set the post date
 func (p *PostFormatter) setDate(s string) {
-	d, err := time.Parse(dateFormat, s)
+	d, err := time.Parse(p.config.dateFormat, s)
 	if err != nil {
 		return
 	}
@@ -140,5 +156,5 @@ func (p *PostFormatter) Format(templateFile string) ([]byte, error) {
 
 // Format the date into configured readable format.
 func (p *PostFormatter) Date() string {
-	return p.date.Format(dateFormat)
+	return p.date.Format(p.config.dateFormat)
 }
