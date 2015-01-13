@@ -26,8 +26,8 @@ func readConfig(filename string) ([]string, error) {
 
 func check(b *bleedy.Blog) {
 	for {
-		time.Sleep(time.Second * 10)
 		b.UpdateScan()
+		time.Sleep(time.Second * 10)
 	}
 }
 

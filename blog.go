@@ -16,8 +16,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -89,7 +89,7 @@ func (b *Blog) Output() string {
 
 // reads from the specified input file (markdown), creates a new Post, and returns it.
 func (b *Blog) readFile(file string, date time.Time) (Formatter, error) {
-	name := path.Join(b.input.dir, file) + b.input.ext
+	name := file // + b.input.ext
 	content, err := ioutil.ReadFile(name)
 	if err != nil {
 		fmt.Println(err)
@@ -106,6 +106,9 @@ func (b *Blog) readFile(file string, date time.Time) (Formatter, error) {
 
 // formats and writes the content of a Post to the specified file
 func (b *Blog) writeFile(file string, f Formatter) error {
+	name := b.output.dir + "/" + strings.TrimSuffix(path.Base(file), b.input.ext) + b.output.ext
+	name, _ = filepath.Abs(name)
+	fmt.Println(name)
 	template := path.Join(b.template.dir, b.template.def) + b.template.ext
 
 	output, err := f.Format(template)
@@ -113,7 +116,7 @@ func (b *Blog) writeFile(file string, f Formatter) error {
 		return err
 	}
 
-	err = ioutil.WriteFile(path.Join(b.output.dir, file)+b.output.ext, output, 0600)
+	err = ioutil.WriteFile(name, output, 0600)
 	if err != nil {
 		return err
 	}
@@ -133,52 +136,74 @@ func (b *Blog) UpdateScan() {
 	b.update(b.scan(false))
 }
 
-// scans the input directory for new/modified files, adds them to the update list. If force == true, adds all files to the list.
-func (b *Blog) scan(force bool) (update []os.FileInfo) {
-	// read all the files in the input directory
-	files, err := ioutil.ReadDir(b.input.dir)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
+type fileT struct {
+	name string    // full path
+	date time.Time // last modified time
+}
 
+// scans the input directory for new/modified files, adds them to the update list. If force == true, adds all files to the list.
+func (b *Blog) scan(force bool) (update []fileT) {
+	// TODO: Need to add a struct level root path to simplify directory structure tracking
+	dirPath, err := filepath.Abs(b.input.dir)
+	files, err := b.scanDir(dirPath)
+	if err != nil {
+		b.log.Println(err)
+	}
 	// check each file
 	for _, f := range files {
-		n := f.Name()
-		switch {
-		case f.IsDir(): // TODO: descend into directory, auto-tag with name
-			continue
-		case strings.HasSuffix(n, b.input.ext): // check the suffix
-			n := strings.TrimSuffix(n, b.input.ext) // remove the suffix
-			if _, ok := b.hash[n]; ok {             // is it already in the hashmap?
-				b.log.Printf("%v was last updated %v ago\n", n, time.Since(b.hash[n]))
-				if b.hash[n] == f.ModTime() && !force {
+		if strings.HasSuffix(f.name, b.input.ext) { // check the suffix
+			n := strings.TrimSuffix(f.name, b.input.ext) // remove the suffix
+			if _, ok := b.hash[n]; ok {                  // is it already in the hashmap?
+				if b.hash[n] == f.date && !force {
 					continue // file has not been modified since the last check, ignore it
 				}
 			}
 			update = append(update, f)
-			b.hash[n] = f.ModTime() // store the last modified time
+			b.hash[n] = f.date // store the last modified time
 		}
-
 	}
+	fmt.Println(len(update))
 	return update
 }
 
+func (b *Blog) scanDir(dir string) (out []fileT, err error) {
+	//fmt.Printf("Reading directory %v\n", dir)
+	in, err := ioutil.ReadDir(dir)
+	if err != nil {
+		b.log.Println(err)
+		return nil, err
+	}
+
+	for _, f := range in {
+		if f.IsDir() {
+			newf, err := b.scanDir(dir + "/" + f.Name())
+			if err != nil {
+				b.log.Println(err)
+			}
+			out = append(out, newf...)
+		} else {
+			q := fileT{dir + "/" + f.Name(), f.ModTime()}
+			out = append(out, q)
+		}
+	}
+	return out, nil
+}
+
 // takes a list of files, reads each, formats it, and writes it to the output
-func (b *Blog) update(files []os.FileInfo) {
+func (b *Blog) update(files []fileT) {
 	for _, f := range files {
-		n := strings.TrimSuffix(f.Name(), b.input.ext) // remove the suffix
+		n := f.name // remove the suffix
 		b.log.Printf("Update %v\n", n)
-		post, err := b.readFile(n, f.ModTime()) // read the file, creating a post
+		post, err := b.readFile(n, f.date) // read the file, creating a post
 		if err != nil {
 			b.log.Println(err, "Will continue trying.")
-			return
+			continue
 		}
 
 		err = b.writeFile(n, post) // write the post to a file
 		if err != nil {
 			b.log.Println(err, "Will continue trying.")
-			return
+			continue
 		}
 	}
 }
